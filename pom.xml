@@ -41,6 +41,7 @@
     <maven.compiler.target>1.6</maven.compiler.target>
     <encoding>UTF-8</encoding>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <skipTests>true</skipTests>
   </properties>
   <build>
     <sourceDirectory>src</sourceDirectory>

@@ -6,6 +6,8 @@ import java.util.zip.*;
 
 import java.io.*;
 
+import cc.mallet.types.IDSorter;
+import cc.mallet.types.InstanceList;
 import cc.mallet.types.*;
 import cc.mallet.util.*;
 import cc.mallet.pipe.iterator.DBInstanceIterator;
@@ -76,7 +78,7 @@ public class LabeledLDA implements Serializable {
          "The filename in which to write the top words for each topic and any Dirichlet parameters.  " +
 		 "By default this is null, indicating that no file will be written.", null);
 
-	static CommandOption.Integer numTopWords = new CommandOption.Integer(LabeledLDA.class, "num-top-words", "INTEGER", true, 20,
+	static CommandOption.Integer numTopWords = new CommandOption.Integer(LabeledLDA.class, "num-top-words", "INTEGER", true, 20000,
 		 "The number of most probable words to print for each topic after model estimation.", null);
 
 	static CommandOption.Integer showTopicsIntervalOption = new CommandOption.Integer(LabeledLDA.class, "show-topics-interval", "INTEGER", true, 50,
@@ -148,6 +150,20 @@ public class LabeledLDA implements Serializable {
 		 "Beta parameter: smoothing over word distributions.",null);
 
 
+	//-ES 2015/07/08
+	static CommandOption.String m_typeLabelCountsFilepath = 
+		new CommandOption.String(LabeledLDA.class, "output-word-label-counts-file", 
+								 "FILENAME", true, null,
+								 "The filename in which to write type label counts.  " +
+								 "By default this is null, indicating that no file will be written.", null);
+
+
+	//-ES 2015/07/08
+	static CommandOption.String m_str_sliceNumber =
+		new CommandOption.String(LabeledLDA.class, "slice-number", "STRING", true, "0",
+								  "String slice number for N-fold cross validation slices.", null);
+	
+
 	// the training instances and their topic assignments
 	protected ArrayList<TopicAssignment> data;  
 
@@ -180,6 +196,12 @@ public class LabeledLDA implements Serializable {
 	// Statistics needed for sampling.
 	protected int[][] typeTopicCounts; // indexed by <feature index, topic index>
 	protected int[] tokensPerTopic; // indexed by <topic index>
+
+	//word(type) label counts -ES 2015/07/08
+	//Computed only if --output-type-label-counts-file is set.
+	//If so, then this is computed once when the instances are loaded into the LabeledLDA, and not used in estimation.
+	public int[][] m_typeLabelCounts; // indexed by <feature index, topic index>
+
 
 	public int numIterations = 1000;
 
@@ -219,6 +241,9 @@ public class LabeledLDA implements Serializable {
 	public int[][] getTypeTopicCounts() { return typeTopicCounts; }
 	public int[] getTopicTotals() { return tokensPerTopic; }
 
+	//-ES 2015/07/08
+	public int[][] getTypeLabelCounts() { return m_typeLabelCounts; }
+
 	public void addInstances (InstanceList training) {
 
 		alphabet = training.getDataAlphabet();
@@ -231,6 +256,9 @@ public class LabeledLDA implements Serializable {
 		oneDocTopicCounts = new int[numTopics];
 		tokensPerTopic = new int[numTopics];
 		typeTopicCounts = new int[numTypes][numTopics];
+		if(m_typeLabelCountsFilepath != null){
+			m_typeLabelCounts = new int[numTypes][numTopics];
+		}
 
 		topicAlphabet = AlphabetFactory.labelAlphabetOfSize(numTopics);
 
@@ -239,22 +267,35 @@ public class LabeledLDA implements Serializable {
 		for (Instance instance : training) {
 			doc++;
 
-			FeatureSequence tokens = (FeatureSequence) instance.getData();
-			FeatureVector labels = (FeatureVector) instance.getTarget();
+			FeatureSequence tokens = (FeatureSequence) instance.getData(); //A sequence, one per word of the document, of 
+			                                                               //the index of that word token in the alphabet. -ES
+			FeatureVector labels = (FeatureVector) instance.getTarget(); //a FeatureVector of length numTopics with a 1 for
+			                                                             //every label that is true for this instance. -ES
 
-			LabelSequence topicSequence =
-				new LabelSequence(topicAlphabet, new int[ tokens.size() ]);
+			LabelSequence topicSequence =                                //An assignment of a topic responsible for a token (word). -ES
+				new LabelSequence(topicAlphabet, new int[ tokens.size() ]);  
 			
 			int[] topics = topicSequence.getFeatures();
 			for (int position = 0; position < tokens.size(); position++) {
 
+				//Initialize typeTopicCounts for each word in the document with a random topic from the 
+				//label set. -ES
 				int topic = labels.indexAtLocation(random.nextInt(labels.numLocations()));
 
 				topics[position] = topic;
 				tokensPerTopic[topic]++;
 				
 				int type = tokens.getIndexAtPosition(position);
+
 				typeTopicCounts[type][topic]++;
+
+				if(m_typeLabelCountsFilepath != null){
+					for(int label_location = 0; label_location < labels.numLocations(); label_location++){
+						int label = labels.indexAtLocation(label_location);
+						m_typeLabelCounts[type][label]++;
+					}
+				}
+
 			}
 
 			TopicAssignment t = new TopicAssignment (instance, topicSequence);
@@ -316,7 +357,7 @@ public class LabeledLDA implements Serializable {
 			for (int doc = 0; doc < data.size(); doc++) {
 				FeatureSequence tokenSequence =
 					(FeatureSequence) data.get(doc).instance.getData();
-				FeatureVector labels = (FeatureVector) data.get(doc).instance.getTarget();
+				FeatureVector labels = (FeatureVector) data.get(doc).instance.getTarget();  //a SparseVector
 				LabelSequence topicSequence =
 					(LabelSequence) data.get(doc).topicSequence;
 
@@ -324,7 +365,9 @@ public class LabeledLDA implements Serializable {
 			}
 		
             long elapsedMillis = System.currentTimeMillis() - iterationStart;
-			logger.info(iteration + "\t" + elapsedMillis + "ms\t");
+			if(iteration % 10 == 0){
+				logger.info(iteration + "\t" + elapsedMillis + "ms\t");
+			}
 
 			// Occasionally print more information
 			if (showTopicsInterval != 0 && iteration % showTopicsInterval == 0) {
@@ -336,7 +379,7 @@ public class LabeledLDA implements Serializable {
 	}
 	
 	protected void sampleTopicsForOneDoc (FeatureSequence tokenSequence,
-										  FeatureVector labels,
+										  FeatureVector labels,                //a SparseVector
 										  FeatureSequence topicSequence) {
 
 		int[] possibleTopics = labels.getIndices();
@@ -521,10 +564,16 @@ public class LabeledLDA implements Serializable {
 
 		StringBuilder output = new StringBuilder();
 
+		System.out.println("LabeledLDA.topWords numTypes: " + numTypes + "  numWords: " + numWords);
 		IDSorter[] sortedWords = new IDSorter[numTypes];
 
 		for (int topic = 0; topic < numTopics; topic++) {
-			if (tokensPerTopic[topic] == 0) { continue; }
+
+			//commented out because we need to include all topics in the trainX-llda.keys file
+			//even if all of the words for the topic were eliminated as stopwords 2015/07/10 -ES
+			//if (tokensPerTopic[topic] == 0) { 
+			//continue; 
+			//}
 			
 			for (int type = 0; type < numTypes; type++) {
 				sortedWords[type] = new IDSorter(type, typeTopicCounts[type][topic]);
@@ -533,9 +582,14 @@ public class LabeledLDA implements Serializable {
 			Arrays.sort(sortedWords);
 			
 			output.append(topic + "\t" + labelAlphabet.lookupObject(topic) + "\t" + tokensPerTopic[topic] + "\t");
-			for (int i=0; i < numWords; i++) {
-				if (sortedWords[i].getWeight() == 0) { break; }
-				output.append(alphabet.lookupObject(sortedWords[i].getID()) + " ");
+			for (int i=0; i < numWords && i < numTypes; i++) {   //had to add in test for i < numTypes 
+                                                                 //with the addition of a background count of 1, so now all
+				                                                 //words have min weight 1.0 for every topic
+				                                                 //-ES 2015/10/28
+				if (sortedWords[i].getWeight() == 0) { 
+					break; 
+				}
+				output.append(alphabet.lookupObject(sortedWords[i].getID()) + " " + sortedWords[i].getWeight() + "    ");
 			}
 			output.append("\n");
 		}
@@ -627,6 +681,87 @@ public class LabeledLDA implements Serializable {
 		}
 	}
 
+
+
+	/**
+	 *  Write the internal representation of type-label counts  
+	 *   (count/label pairs in descending order by count) to a file.
+	 *  Borrowed from ParallelTopicModel.printTypeTopicCounts() 
+	 *  2015/07/08 -ES 
+	 */
+	public void printTypeLabelCountsUnsorted(File file) throws IOException {
+		PrintWriter out = new PrintWriter (new FileWriter (file) );
+
+		for (int type = 0; type < numTypes; type++) {
+
+			StringBuilder buffer = new StringBuilder();
+
+			buffer.append(type + " " + alphabet.lookupObject(type));
+
+			for(int label = 0; label < numTopics; label++){
+				int count = m_typeLabelCounts[type][label];
+				
+				if(count > 0){
+					buffer.append(" " + label + ":" + count);
+				}
+
+			}
+
+			out.println(buffer);
+		}
+		out.close();
+	}
+
+
+	/**
+	 *  Write the internal representation of type-label counts  
+	 *   (count/label pairs in descending order by count) to a file.
+	 *  Borrowed from ParallelTopicModel.printTypeTopicCounts() 
+	 *  2015/07/08 -ES 
+	 */
+	public void printTypeLabelCounts(File file) throws IOException {
+		int label, count, max_count;
+		String word_used_only_once;
+		PrintWriter out = new PrintWriter (new FileWriter (file) );
+		ArrayList<String> words_used_only_once = new ArrayList<String>();
+		StringBuffer sb = new StringBuffer();
+
+		IDSorter[] sortedTopics = new IDSorter[numTopics];
+
+		for (int type = 0; type < numTypes; type++) {
+			StringBuilder buffer = new StringBuilder();			
+			buffer.append(type + " " + alphabet.lookupObject(type));
+			max_count = 0;
+
+			for(label = 0; label < numTopics; label++){
+				count = m_typeLabelCounts[type][label];
+				sortedTopics[label] = new IDSorter(label, count);
+			}
+
+			Arrays.sort(sortedTopics);
+
+			for(int label_index = 0; label_index < numTopics; label_index++){
+				label = sortedTopics[label_index].getID();
+				count = m_typeLabelCounts[type][label];
+				
+				if(count > 0){
+					buffer.append(" " + label + ":" + count);
+					max_count = Math.max(count, max_count);
+				}
+			}
+			if(max_count < 2){
+				word_used_only_once = (String)alphabet.lookupObject(type);
+				words_used_only_once.add(word_used_only_once);
+				sb.append(word_used_only_once);
+				sb.append(" ");
+			}
+			out.println(buffer);
+		}
+		out.close();
+
+	}
+
+
 	public static void main (String[] args) throws Exception {
 
 		CommandOption.setSummary (LabeledLDA.class,
@@ -708,7 +843,12 @@ public class LabeledLDA implements Serializable {
 				logger.warning("Couldn't write topic model to filename " + outputModelFilename.value);
 			}
 		}
-		
+
+		//-ES 2015/07/08
+		if(m_typeLabelCountsFilepath != null){
+			labeledLDA.printTypeLabelCounts(new File(m_typeLabelCountsFilepath.value));
+		}
+
 		// I don't want to directly inherit from ParallelTopicModel 
 		//  because the two implementations treat the type-topic counts differently.
 		// Instead, simulate a standard Parallel Topic Model by copying over 

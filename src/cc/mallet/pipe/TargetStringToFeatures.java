@@ -26,6 +26,8 @@ public class TargetStringToFeatures extends Pipe implements Serializable {
 		for (int i=0; i<features.length; i++) {
 
 			// Support the syntax "FEATURE=0.000342 OTHER_FEATURE=-2.32423"                                       \
+			//debugging a bad data file
+			//System.out.println("i: " + i + " featuresLine: " + featuresLine);
                                                                                                                        
 			if (features[i].indexOf("=") != -1) {
 				String[] keyValuePair = features[i].split("=");

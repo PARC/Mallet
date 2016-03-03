@@ -48,9 +48,20 @@ public class InferTopics {
         (InferTopics.class, "burn-in", "INTEGER", true, 10,
          "The number of iterations before the first sample is saved.", null);
 
+	//This was not quite as advertised.
+	//The default 0 was using the random seed stored in the trained model.
+	//Modified 2015/10/29 to make it generate a new random seed from the clock. -ES
     static CommandOption.Integer randomSeed = new CommandOption.Integer
         (InferTopics.class, "random-seed", "INTEGER", true, 0,
          "The random seed for the Gibbs sampler.  Default is 0, which will use the clock.", null);
+
+
+	//added 2015/10/08 -ES	
+    static CommandOption.String topicKeysFilepath = new CommandOption.String
+        (InferTopics.class, "topic-keys-filepath", "FILENAME", true, null,
+         "The trainX-llda.keys filepath that lists topics and their words and weights\n" +
+         "By default this is null, indicating that the file cannot be used.", null);
+
 
 	public static void main (String[] args) {
 
@@ -71,19 +82,31 @@ public class InferTopics {
 
 		try {
 			
-			TopicInferencer inferencer = 
-				TopicInferencer.read(new File(inferencerFilename.value));
+			//The inferencer stored to a file will retain its random seed Randoms.
+			TopicInferencer inferencer = TopicInferencer.read(new File(inferencerFilename.value));
 
 			InstanceList instances = InstanceList.load (new File(inputFile.value));
 
 			if (randomSeed.value != 0) {
+				System.out.println("randomSeed.value is " + randomSeed.value);
 				inferencer.setRandomSeed(randomSeed.value);
 			}
+			//This added 2015/010/29 to make the topic inferencer generate a new random seed from the clock
+			//if a non-zero value is not passed in.
+			//This could still be modified to look for a negative number or something if we want to 
+			//re-use the seed stored with the inferencer in inferencerFilename.
+			//-ES 2015/10/29
+			else{
+				inferencer.setNewRandomSeedFromClock();
+			}
+			System.out.println("randomSeed: " + inferencer.getRandoms() + "   " + inferencer.getRandoms().nextInt(100000));
+			System.out.println("randomSeed: " + inferencer.getRandoms() + "   " + inferencer.getRandoms().nextInt(100000));
+			
 
 			inferencer.writeInferredDistributions(instances, new File(docTopicsFile.value),
 												  numIterations.value, sampleInterval.value,
 												  burnInIterations.value,
-												  docTopicsThreshold.value, docTopicsMax.value);
+												  docTopicsThreshold.value, docTopicsMax.value, topicKeysFilepath.value);
 			
 
 		} catch (Exception e) {

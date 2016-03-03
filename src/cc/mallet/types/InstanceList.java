@@ -262,10 +262,17 @@ public class InstanceList extends ArrayList<Instance> implements Serializable, I
 	{
 		//for debug
 		Iterator<Instance> pipedInstanceIterator = pipe.newIteratorFrom(ii);
+		int count = 0;
 		while (pipedInstanceIterator.hasNext())
 		{	
-			add (pipedInstanceIterator.next());
-		    //System.out.println("Add instance " + pipedInstanceIterator.next().getName());
+			count++;
+			//add (pipedInstanceIterator.next());
+			Instance the_instance = pipedInstanceIterator.next(); 
+			if(count < 5){
+				System.out.println("Add instance " + the_instance.getName() + 
+						" source: " + the_instance.getSource() + " target: " + the_instance.getTarget());
+			}
+			add (the_instance);
 		}
 	}
 	

@@ -113,6 +113,42 @@ public class ParallelTopicModel implements Serializable {
 		return ret;
 	}
 
+	/*
+	//This was the July, 2015 checkout.  It looks like it was superseded by a later one on the 
+	//David Mimno branch of Mallet.  -ES 2016/03/03
+	public ParallelTopicModel (LabelAlphabet topicAlphabet, double alphaSum, double beta) {
+		
+		this.data = new ArrayList<TopicAssignment>();
+		this.topicAlphabet = topicAlphabet;
+		this.numTopics = topicAlphabet.size();
+
+		if (Integer.bitCount(numTopics) == 1) {
+			// exact power of 2
+			topicMask = numTopics - 1;
+			topicBits = Integer.bitCount(topicMask);
+		}
+		else {
+			// otherwise add an extra bit
+			topicMask = Integer.highestOneBit(numTopics) * 2 - 1;
+			topicBits = Integer.bitCount(topicMask);
+		}
+
+
+		this.alphaSum = alphaSum;
+		this.alpha = new double[numTopics];
+		Arrays.fill(alpha, alphaSum / numTopics);
+		this.beta = beta;
+		
+		tokensPerTopic = new int[numTopics];
+		
+		formatter = NumberFormat.getInstance();
+		formatter.setMaximumFractionDigits(5);
+
+		logger.info("Mallet LDA: " + numTopics + " topics, " + topicBits + " topic bits, " + 
+					Integer.toBinaryString(topicMask) + " topic mask");
+	}
+	*/
+
 	public ParallelTopicModel (LabelAlphabet topicAlphabet, double alphaSum, double beta) {
 		
 		this.data = new ArrayList<TopicAssignment>();
@@ -266,23 +302,6 @@ public class ParallelTopicModel implements Serializable {
 
 		// Skip some lines starting with "#" that describe the format and specify hyperparameters
 		while (line.startsWith("#")) {
-			if (line.startsWith("#alpha : ")) {
-				line = line.replace("#alpha : ", "");
-				fields = line.split(" ");
-				
-				setNumTopics(fields.length);
-				this.alphaSum = 0.0;
-				for (int topic = 0; topic < fields.length; topic++) {
-					this.alpha[topic] = Double.parseDouble(fields[topic]);
-					this.alphaSum += this.alpha[topic];
-				}
-			}
-			else if (line.startsWith("#beta : ")) {
-				line = line.replace("#beta : ", "");
-				this.beta = Double.parseDouble(line);
-				this.betaSum = beta * numTypes;
-			}
-			
 			line = reader.readLine();
 		}
 		
@@ -1207,7 +1226,8 @@ public class ParallelTopicModel implements Serializable {
 			Iterator<IDSorter> iterator = sortedWords.iterator();
 
 			if (usingNewLines) {
-				out.append (topic + "\t" + formatter.format(alpha[topic]) + "\n");
+				//out.append (topic + "\t" + formatter.format(alpha[topic]) + "\n");
+				out.append (topic + "\t" + formatter.format(topic) + "\n");
 				while (iterator.hasNext() && word < numWords) {
 					IDSorter info = iterator.next();
 					out.append(alphabet.lookupObject(info.getID()) + "\t" + formatter.format(info.getWeight()) + "\n");
@@ -1215,7 +1235,12 @@ public class ParallelTopicModel implements Serializable {
 				}
 			}
 			else {
-				out.append (topic + "\t" + formatter.format(alpha[topic]) + "\t");
+				//This commented out and replaced by outputting the topic because when running pure LDA,
+				//we need the -topic-keys.txt file to have the topic index in the second column.
+				//Not sure if this will affect LLDA, I think it shouldn't.
+				//2016/02/12 for doing LDA and inference on the compost data set. -ES
+				//out.append (topic + "\t" + formatter.format(alpha[topic]) + "\t");
+				out.append (topic + "\t" + formatter.format(topic) + "\t");
 
 				while (iterator.hasNext() && word < numWords) {
 					IDSorter info = iterator.next();
