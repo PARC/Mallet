@@ -17,6 +17,7 @@ import cc.mallet.classify.*;
 import cc.mallet.pipe.*;
 import cc.mallet.pipe.iterator.*;
 import cc.mallet.types.*;
+import cc.mallet.util.CommandOption;
 import cc.mallet.util.*;
 
 /**
@@ -37,8 +38,9 @@ public class Csv2Vectors {
 	public static String defaultLineRegex = "^(\\S*)[\\s,]*(\\S*)[\\s,]*(.*)$";
 	public static String defaultTokenRegex = "\\p{L}[\\p{L}\\p{P}]+\\p{L}";
 
+	//the arg following "--input" will be a filepath which then gets parsed to a java.io.File by the ComandOption class.
 	static CommandOption.File inputFile = new CommandOption.File(Csv2Vectors.class, "input", "FILE", true, null,
-		 "The file containing data to be classified, one instance per line", null);
+		 "The file containing data to be classified, one instance per line, Using - indicates stdin", null);
 
 	static CommandOption.File outputFile = new CommandOption.File(Csv2Vectors.class, "output", "FILE", true, new File("text.vectors"),
 		 "Write the instance list to this file; Using - indicates stdout.", null);

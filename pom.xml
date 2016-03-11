@@ -46,6 +46,77 @@
   <build>
     <sourceDirectory>src</sourceDirectory>
     <testSourceDirectory>src</testSourceDirectory>
+
+	<!-- added filters to include various properties and xml files -ES 2016/03/09 per 
+ 	http://www.avajava.com/tutorials/lessons/how-do-i-filter-resources-based-on-values-from-a-properties-file.html 
+	-->
+	<filters>
+	  <!-- picked up under the resources directory, below
+		  <filter>src/cc/mallet/util/resources/...filename.properties</filter>
+	  -->
+	  <filter>src/cc/mallet/util/resources/wn/database_properties.xml</filter>
+	  <filter>src/cc/mallet/util/resources/wn/file_properties.xml</filter>
+	  <filter>src/cc/mallet/util/resources/wn/jwnl_properties.dtd</filter>
+	  <filter>src/cc/mallet/util/resources/wn/jwnl_properties.xsd</filter>
+	  <filter>src/cc/mallet/util/resources/wn/jwnl-properties.xml</filter>
+	  <filter>src/cc/mallet/util/resources/wn/map_properties.xml</filter>
+	</filters>
+
+	<resources>
+	  <resource>
+		<!-- <resource combine.children="append">  utterly bogus, maven throws an error -->
+		<!-- <targetPath>src/cc/mallet/util/resources</targetPath> doesn't help-->
+		<directory>src/cc/mallet/util/resources</directory>
+		<!--
+	    Hmmm  including this as a directory causes massive build errors.
+		<directory>src/cc/mallet/util/resources/wn</directory>
+		-->
+		<filtering>true</filtering>
+	  </resource>
+	</resources>
+
+	<plugins>
+	  <plugin>
+		<artifactId>maven-resources-plugin</artifactId>
+		<version>2.7</version>
+		<executions>
+		  <execution>
+			<!-- needs to be in the validate phase -->
+			<phase>validate</phase>
+			<goals>
+			  <goal>copy-resources</goal>
+			</goals>
+			<configuration>
+			  <outputDirectory>${basedir}/target/classes/cc/mallet/util/resources</outputDirectory>
+			  <resources>
+				<resource>
+				  <!-- <resource combine.children="append">  utterly bogus, maven throws an error -->
+				  <!-- <targetPath>src/cc/mallet/util/resources</targetPath> doesn't help-->
+				  <directory>src/cc/mallet/util/resources</directory>
+				  <!--
+					  Hmmm  including this as a directory causes massive build errors.
+					  <directory>src/cc/mallet/util/resources/wn</directory>
+				  -->
+				  <filtering>true</filtering>
+				</resource>
+				<resource>
+				  <!-- <resource combine.children="append">  utterly bogus, maven throws an error -->
+				  <!-- <targetPath>src/cc/mallet/util/resources</targetPath> doesn't help-->
+				  <directory>src/cc/mallet/util/resources</directory>
+				  <!--
+					  Hmmm  including this as a directory causes massive build errors.
+					  <directory>src/cc/mallet/util/resources/wn</directory>
+				  -->
+				  <filtering>true</filtering>
+				</resource>
+			  </resources>
+			</configuration>
+		  </execution>
+		</executions>
+	  </plugin>
+	</plugins>
+
+
   </build>
   <dependencies>
     <dependency>

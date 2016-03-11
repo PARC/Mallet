@@ -13,11 +13,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
@@ -34,7 +34,6 @@ import cc.mallet.pipe.SerialPipes;
 import cc.mallet.pipe.Target2Label;
 import cc.mallet.pipe.TokenSequence2FeatureSequence;
 import cc.mallet.pipe.iterator.RandomTokenSequenceIterator;
-
 import cc.mallet.util.MalletLogger;
 import cc.mallet.util.Randoms;
 
@@ -788,8 +787,10 @@ public InstanceList[] splitInOrder (double[] proportions) {
 	{
 		try {
 			ObjectInputStream ois;
-			if (file.toString().equals("-"))
+			if (file.toString().equals("-")){
+				InputStream system_in = System.in;
 				ois = new ObjectInputStream (System.in);
+			}
 			else
 				ois = new ObjectInputStream (new BufferedInputStream(new FileInputStream (file)));
 
